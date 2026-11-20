@@ -1,0 +1,9 @@
+# 镜像构建时下载的 jar：<目标镜像> <Maven 路径>
+# 版本号以 infra/versions.env 为准，修改时两处同步。
+flink org/apache/paimon/paimon-flink-1.20/1.4.2/paimon-flink-1.20-1.4.2.jar
+flink org/apache/flink/flink-sql-connector-kafka/3.4.0-1.20/flink-sql-connector-kafka-3.4.0-1.20.jar
+flink org/apache/flink/flink-connector-jdbc/3.3.0-1.20/flink-connector-jdbc-3.3.0-1.20.jar
+flink org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar
+flink org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
+spark org/apache/paimon/paimon-spark-3.5_2.12/1.4.2/paimon-spark-3.5_2.12-1.4.2.jar
+spark org/postgresql/postgresql/42.7.14/postgresql-42.7.14.jar

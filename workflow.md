@@ -107,6 +107,7 @@ flowchart LR
 - **产出**：`Claude.md` 第 1.3 节填入确切版本号；一份 jar 下载地址清单。
 - **验收**：每个 jar 的 URL 都能下载（`curl -I` 返回 200）。
 - **风险**：这是全项目最容易卡住的地方。不确定时选 Paimon 文档"快速开始"里使用的版本组合。
+- **结果（2026-11-19 完成）**：Flink 1.20.5、Paimon 1.4.2、Spark 3.5.9、Kafka 4.3.2、PostgreSQL 16.15；另外按 Paimon 文档要求补充了 Flink 的 Hadoop 预打包 jar。版本写入 `infra/versions.env`，jar 清单写入 `infra/jars.txt`；`scripts/check_jars.sh` 验证 7 个 jar 全部返回 200，4 个镜像都有 arm64 版本。选型理由见 `Claude.md` 第 1.3 节。
 
 #### T02 编写 docker-compose 与 Makefile `P0 · 0.5 天 · T01`
 - **做什么**：kafka（KRaft，带 `localhost:9094` 外部 listener）、flink-jobmanager、flink-taskmanager、postgres 常驻；spark 放在 `profiles: [batch]`。全部设置 `mem_limit` 和健康检查，端口只绑定 `127.0.0.1`。Flink 与 Spark 挂载同一个 volume 到 `/data/paimon`。
@@ -348,7 +349,7 @@ git push         # 推送当天进度
 
 | 任务 | 名称 | 优先级 | 预计 | 状态 |
 |---|---|---|---|---|
-| T01 | 核对组件版本 | P0 | 0.5 | ⬜ |
+| T01 | 核对组件版本 | P0 | 0.5 | ✅ |
 | T02 | docker-compose 与 Makefile | P0 | 0.5 | ⬜ |
 | T03 | Flink 与 Spark 镜像 | P0 | 0.5 | ⬜ |
 | T04 | Paimon 冒烟测试 | P0 | 0.5 | ⬜ |

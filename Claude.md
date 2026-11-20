@@ -63,17 +63,26 @@ Flink（常驻）              Spark（按需，每天一次）
 
 ### 1.3 版本选择
 
-| 组件 | 版本 | 说明 |
-|---|---|---|
-| Flink | 1.20.x（`flink:1.20-scala_2.12-java17`） | Paimon 对 1.20 支持最成熟 |
-| Paimon | 1.x 最新稳定版 | 用 `paimon-flink-1.20` 与 `paimon-spark-3.5` 两个 jar，版本号保持一致 |
-| Spark | 3.5.x（`apache/spark:3.5.x`） | 与 `paimon-spark-3.5` 对应 |
-| Kafka | `apache/kafka` 3.9+（KRaft） | 无需 ZooKeeper |
-| Flink Kafka connector | 与 Flink 1.20 对应的 `flink-sql-connector-kafka` | |
-| Flink JDBC connector | 与 Flink 1.20 对应的 `flink-connector-jdbc` + `postgresql` 驱动 | 告警写入 Postgres |
-| PostgreSQL | 16 | |
+已于 2026-11-19 核对（T01）。版本的唯一来源是 [`infra/versions.env`](infra/versions.env)，jar 清单在 [`infra/jars.txt`](infra/jars.txt)，用 `scripts/check_jars.sh` 验证下载地址。
 
-> **Phase 0 的第一件事**：去 Maven Central 和 Paimon 官方文档的兼容矩阵核对上述 jar 的确切版本号，然后在 Dockerfile 中写死。版本不匹配是本项目最容易卡住的地方。
+| 组件 | 确定版本 | 说明 |
+|---|---|---|
+| Flink 镜像 | `flink:1.20.5-scala_2.12-java17` | 1.20 系列最新补丁版，有 arm64 |
+| Paimon | **1.4.2** | `paimon-flink-1.20-1.4.2.jar` 与 `paimon-spark-3.5_2.12-1.4.2.jar`，两边版本一致 |
+| Hadoop 依赖（Flink） | `flink-shaded-hadoop-2-uber-2.8.3-10.0.jar` | Paimon 1.4 文档要求：没有 Hadoop 环境时，Flink 的 lib 目录需要放这个预打包 jar；Spark 镜像自带 Hadoop，不需要 |
+| Flink Kafka connector | `flink-sql-connector-kafka-3.4.0-1.20` | 1.20 对应的最新版 |
+| Flink JDBC connector | `flink-connector-jdbc-3.3.0-1.20` | 单 jar，包含 Postgres 方言；告警写入 Postgres |
+| PostgreSQL JDBC 驱动 | `postgresql-42.7.14` | Flink 与 Spark 共用 |
+| Spark 镜像 | `apache/spark:3.5.9-scala2.12-java17-python3-ubuntu` | 带 Python，可直接跑 PySpark；Scala 2.12 与 Paimon jar 对应 |
+| Kafka 镜像 | `apache/kafka:4.3.2` | KRaft 模式；4.x broker 兼容 connector 使用的 3.x 客户端 |
+| PostgreSQL 镜像 | `postgres:16.15` | |
+
+**选型说明**
+
+- **Paimon 选 1.4.2 而不是最新的 2.1.0。** 2.x 是大版本升级，官方文档结构也重组了，Flink / Spark 的快速开始步骤不如 1.4 的完整；1.4.2 发布于 2026 年 6 月，文档里有逐步的部署说明，适合第一次接触 Paimon。本项目用到的主键表、`deduplicate` 合并引擎、`changelog-producer`、lookup join 在 1.4 中都已成熟。Phase 5 之后可以评估升级。
+- **Flink 留在 1.20 而不是 2.x。** 1.20 的社区资料和示例最多，Paimon 与各 connector 对它的支持最稳定。
+- **JDBC connector 选 3.3.0 而不是 3.4.0。** 3.4.0 开始拆分为 core 与各数据库方言的独立 jar，3.3.0 单 jar 更简单。
+- 所有镜像都写死到补丁版本，不使用 `latest` 或主版本号标签。
 
 ---
 
