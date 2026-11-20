@@ -1,0 +1,159 @@
+# LLM 调用可观测性平台：本地运行环境
+#
+# 常驻服务：kafka、flink-jobmanager、flink-taskmanager、postgres
+# 按需服务：spark（profile: batch，用 `docker compose run --rm spark ...` 运行，跑完即退出）
+#
+# 镜像版本来自 infra/versions.env，密码来自 .env；请通过 Makefile 调用，
+# Makefile 会同时加载这两个文件。所有端口只绑定 127.0.0.1。
+#
+# 内存上限合计约 3.9GB（常驻），按 Claude.md 第 1.2 节的预算设置。
+
+name: llmobs
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-flink-env: &flink-env
+  # 追加到 Flink 配置；进程内存要小于容器的 mem_limit，给 JVM 之外的开销留余量
+  FLINK_PROPERTIES: |
+    jobmanager.rpc.address: flink-jobmanager
+    rest.address: flink-jobmanager
+    rest.bind-address: 0.0.0.0
+    jobmanager.memory.process.size: 900m
+    taskmanager.memory.process.size: 1400m
+    taskmanager.numberOfTaskSlots: 2
+    parallelism.default: 1
+    state.backend.type: hashmap
+    state.checkpoints.dir: file:///data/flink/checkpoints
+    state.savepoints.dir: file:///data/flink/savepoints
+
+services:
+  # ------------------------------------------------------------------ 共享卷初始化
+  # Flink 以 uid 9999 运行；Spark 也指定为 uid 9999，这样两边都能读写同一个 Paimon warehouse。
+  volume-init:
+    image: ${FLINK_IMAGE}
+    user: root
+    entrypoint: ["sh", "-c", "mkdir -p /data/paimon /data/flink && chown -R 9999:9999 /data/paimon /data/flink"]
+    volumes:
+      - paimon-data:/data/paimon
+      - flink-data:/data/flink
+
+  # ------------------------------------------------------------------ 消息队列
+  kafka:
+    <<: *restart
+    image: ${KAFKA_IMAGE}
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # 容器内部用 kafka:9092，宿主机（模拟器、Agent）用 localhost:9094
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # topic 由 `make topics` 显式创建
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 24              # 控制磁盘占用
+      KAFKA_HEAP_OPTS: -Xmx384m -Xms384m
+    ports:
+      - "127.0.0.1:9094:9094"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 15s
+    mem_limit: 768m
+
+  # ------------------------------------------------------------------ 流处理
+  flink-jobmanager:
+    <<: *restart
+    image: ${FLINK_IMAGE}   # T03 起改为自建镜像（加入 Paimon / Kafka / JDBC jar）
+    command: jobmanager
+    environment: *flink-env
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - paimon-data:/data/paimon
+      - flink-data:/data/flink
+    depends_on:
+      volume-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/overview >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    mem_limit: 1g
+
+  flink-taskmanager:
+    <<: *restart
+    image: ${FLINK_IMAGE}
+    command: taskmanager
+    environment: *flink-env
+    volumes:
+      - paimon-data:/data/paimon
+      - flink-data:/data/flink
+    depends_on:
+      flink-jobmanager: { condition: service_healthy }
+    healthcheck:
+      # 健康 = 已向 JobManager 注册
+      test: ["CMD-SHELL", "curl -sf http://flink-jobmanager:8081/taskmanagers | grep -q '\"id\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    mem_limit: 1600m
+
+  # ------------------------------------------------------------------ 服务层
+  postgres:
+    <<: *restart
+    image: ${POSTGRES_IMAGE}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5433:5432"   # 宿主机 5432 已被本机 PostgreSQL 占用
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./infra/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 512m
+
+  # ------------------------------------------------------------------ 批处理（按需）
+  spark:
+    profiles: ["batch"]
+    image: ${SPARK_IMAGE}   # T03 起改为自建镜像（加入 Paimon jar）
+    user: "9999:9999"
+    environment:
+      HOME: /tmp
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    working_dir: /opt/llmobs
+    volumes:
+      - paimon-data:/data/paimon
+      - ./src:/opt/llmobs/src:ro
+    ports:
+      - "127.0.0.1:4040:4040"   # Spark UI，仅在作业运行时可用
+    depends_on:
+      volume-init: { condition: service_completed_successfully }
+    mem_limit: 2g
+
+volumes:
+  kafka-data:
+  pg-data:
+  paimon-data:
+  flink-data:

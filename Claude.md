@@ -61,6 +61,17 @@ Flink（常驻）              Spark（按需，每天一次）
 3. 不用时执行 `make down` 并退出容器运行时，释放全部内存。
 4. Kafka 设置 `KAFKA_LOG_RETENTION_HOURS=24`，避免磁盘持续增长。
 
+### 1.2.1 端口（全部只绑定 127.0.0.1）
+
+| 服务 | 宿主机地址 | 容器内地址 |
+|---|---|---|
+| Kafka | `localhost:9094` | `kafka:9092` |
+| Flink Web UI / REST | `localhost:8081` | `flink-jobmanager:8081` |
+| PostgreSQL | `localhost:5433`（本机 5432 已被占用） | `postgres:5432` |
+| Spark UI | `localhost:4040`（仅作业运行时） | — |
+
+Flink 与 Spark 都以 uid 9999 运行，共享 `paimon-data` 卷（挂载到 `/data/paimon`）；卷的所有者由一次性容器 `volume-init` 设置。
+
 ### 1.3 版本选择
 
 已于 2026-11-19 核对（T01）。版本的唯一来源是 [`infra/versions.env`](infra/versions.env)，jar 清单在 [`infra/jars.txt`](infra/jars.txt)，用 `scripts/check_jars.sh` 验证下载地址。

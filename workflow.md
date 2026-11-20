@@ -113,6 +113,8 @@ flowchart LR
 - **做什么**：kafka（KRaft，带 `localhost:9094` 外部 listener）、flink-jobmanager、flink-taskmanager、postgres 常驻；spark 放在 `profiles: [batch]`。全部设置 `mem_limit` 和健康检查，端口只绑定 `127.0.0.1`。Flink 与 Spark 挂载同一个 volume 到 `/data/paimon`。
 - **产出**：`docker-compose.yml`、`.env.example`、`Makefile`（`up` / `down` / `clean` / `status` / `logs` / `topics`）。
 - **验收**：`make up` 后 `make status` 显示所有常驻服务 healthy；`docker stats` 总内存低于 3.5GB。
+- **结果（2026-11-19 完成）**：四个常驻服务全部 healthy；空闲时实际内存合计约 0.95GB（JobManager 287MB、TaskManager 341MB、Kafka 303MB、Postgres 22MB）。宿主机能访问 `localhost:9094`；两个 topic 已创建；Flink 1.20.5 有 1 个 TaskManager、2 个 slot；Flink（uid 9999）和 Spark（指定 uid 9999）都能写入共享的 `/data/paimon`；Spark 3.5.9 容器按需启动正常。所有端口只监听 127.0.0.1。
+- **与原计划的差异**：宿主机 5432 端口已被本机 PostgreSQL 占用，容器的 Postgres 映射到 **5433**。新增 `volume-init` 一次性容器，把共享卷的所有者设为 uid 9999，解决 Flink 和 Spark 用户不同导致无法写入对方目录的问题。
 
 #### T03 构建 Flink 与 Spark 镜像 `P0 · 0.5 天 · T02`
 - **做什么**：Flink Dockerfile 用 wget 下载 Paimon、Kafka、JDBC jar 到 `/opt/flink/lib`；Spark Dockerfile 加入 paimon-spark jar 和 `spark-defaults.conf`。参考 `iceberg-ai-lakehouse` 的 `infra/flink/Dockerfile` 写法。
@@ -350,7 +352,7 @@ git push         # 推送当天进度
 | 任务 | 名称 | 优先级 | 预计 | 状态 |
 |---|---|---|---|---|
 | T01 | 核对组件版本 | P0 | 0.5 | ✅ |
-| T02 | docker-compose 与 Makefile | P0 | 0.5 | ⬜ |
+| T02 | docker-compose 与 Makefile | P0 | 0.5 | ✅ |
 | T03 | Flink 与 Spark 镜像 | P0 | 0.5 | ⬜ |
 | T04 | Paimon 冒烟测试 | P0 | 0.5 | ⬜ |
 | T05 | Python 项目骨架 | P0 | 0.5 | ⬜ |
