@@ -1,0 +1,1 @@
+-- Flink SQL 作业：T04 起在此目录添加 00_catalog.sql 等文件。

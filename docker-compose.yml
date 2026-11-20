@@ -13,6 +13,15 @@ name: llmobs
 x-restart: &restart
   restart: unless-stopped
 
+# 自建镜像：在官方镜像基础上加入 infra/jars.txt 中的 jar（构建时校验 sha1）
+x-flink-build: &flink-build
+  build:
+    context: ./infra
+    dockerfile: flink/Dockerfile
+    args:
+      FLINK_IMAGE: ${FLINK_IMAGE}
+  image: llmobs/flink:${FLINK_VERSION}-paimon${PAIMON_VERSION}
+
 x-flink-env: &flink-env
   # 追加到 Flink 配置；进程内存要小于容器的 mem_limit，给 JVM 之外的开销留余量
   FLINK_PROPERTIES: |
@@ -74,8 +83,7 @@ services:
 
   # ------------------------------------------------------------------ 流处理
   flink-jobmanager:
-    <<: *restart
-    image: ${FLINK_IMAGE}   # T03 起改为自建镜像（加入 Paimon / Kafka / JDBC jar）
+    <<: [*restart, *flink-build]
     command: jobmanager
     environment: *flink-env
     ports:
@@ -94,8 +102,7 @@ services:
     mem_limit: 1g
 
   flink-taskmanager:
-    <<: *restart
-    image: ${FLINK_IMAGE}
+    <<: [*restart, *flink-build]
     command: taskmanager
     environment: *flink-env
     volumes:
@@ -135,7 +142,12 @@ services:
   # ------------------------------------------------------------------ 批处理（按需）
   spark:
     profiles: ["batch"]
-    image: ${SPARK_IMAGE}   # T03 起改为自建镜像（加入 Paimon jar）
+    build:
+      context: ./infra
+      dockerfile: spark/Dockerfile
+      args:
+        SPARK_IMAGE: ${SPARK_IMAGE}
+    image: llmobs/spark:${SPARK_VERSION}-paimon${PAIMON_VERSION}
     user: "9999:9999"
     environment:
       HOME: /tmp

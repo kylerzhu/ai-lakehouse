@@ -120,6 +120,9 @@ flowchart LR
 - **做什么**：Flink Dockerfile 用 wget 下载 Paimon、Kafka、JDBC jar 到 `/opt/flink/lib`；Spark Dockerfile 加入 paimon-spark jar 和 `spark-defaults.conf`。参考 `iceberg-ai-lakehouse` 的 `infra/flink/Dockerfile` 写法。
 - **产出**：`infra/flink/Dockerfile`、`infra/spark/Dockerfile`、`infra/spark/spark-defaults.conf`。
 - **验收**：镜像在 arm64 上构建成功；Flink Web UI（`localhost:8081`）可以打开。
+- **结果（2026-11-19 完成）**：`llmobs/flink:1.20.5-paimon1.4.2`（1.6GB）与 `llmobs/spark:3.5.9-paimon1.4.2`（1.9GB）构建成功，7 个 jar 在构建时全部通过 sha1 校验；Flink UI 返回 200；额外验证了 Flink SQL 客户端和 `spark-sql` 都能加载同一个 Paimon catalog（都看到 `default` 库）。
+- **解决的问题**：① uid 9999 在 Spark 镜像里没有用户名，Hadoop 报 "Unable to determine current user"，在镜像里新建了 uid 9999 的 `llmobs` 用户；② `spark-sql` 默认在只读的工作目录建 Derby 元数据库，改到 `/tmp`。
+- **留给 T04**：`docker compose exec` 默认以 root 身份执行，运行 Flink SQL 客户端时要加 `--user flink`，否则建出的目录归 root 所有，Spark 和 Flink 作业会写不进去。
 
 #### T04 Paimon 冒烟测试 `P0 · 0.5 天 · T03`
 - **做什么**：在 Flink SQL Client 中创建 Paimon catalog 和一张测试主键表，写入几行（包括重复主键）并读出；然后用 Spark SQL 读同一张表。
@@ -353,7 +356,7 @@ git push         # 推送当天进度
 |---|---|---|---|---|
 | T01 | 核对组件版本 | P0 | 0.5 | ✅ |
 | T02 | docker-compose 与 Makefile | P0 | 0.5 | ✅ |
-| T03 | Flink 与 Spark 镜像 | P0 | 0.5 | ⬜ |
+| T03 | Flink 与 Spark 镜像 | P0 | 0.5 | ✅ |
 | T04 | Paimon 冒烟测试 | P0 | 0.5 | ⬜ |
 | T05 | Python 项目骨架 | P0 | 0.5 | ⬜ |
 | T06 | 事件 schema 与 producer | P0 | 1 | ⬜ |

@@ -17,7 +17,10 @@ env: ## 创建 .env 并生成随机密码（已存在则不覆盖）
 	  sed "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$$pw|" .env.example > .env; \
 	  echo "已创建 .env（Postgres 密码为随机生成）"; fi
 
-up: env ## 启动常驻服务（kafka / flink / postgres），等待全部 healthy
+build: env ## 构建自建的 Flink / Spark 镜像（jar 来自 infra/jars.txt，有缓存时很快）
+	$(COMPOSE) --profile batch build
+
+up: build ## 构建镜像并启动常驻服务（kafka / flink / postgres），等待全部 healthy
 	$(COMPOSE) up -d --wait kafka flink-jobmanager flink-taskmanager postgres
 	@$(MAKE) --no-print-directory status
 
@@ -54,4 +57,4 @@ check-jars: ## 验证 infra/jars.txt 中所有 jar 的下载地址
 spark-version: ## 检查 Spark 容器能否启动（按需运行，结束后自动删除）
 	$(COMPOSE) --profile batch run --rm --no-deps spark /opt/spark/bin/spark-submit --version
 
-.PHONY: help env up down clean status stats logs topics check-jars spark-version
+.PHONY: help env build up down clean status stats logs topics check-jars spark-version
