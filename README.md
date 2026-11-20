@@ -202,6 +202,7 @@ src/llmobs/
   dashboard/           Streamlit 看板
 tests/
 Claude.md              详细的实施文档（SQL、代码骨架、分阶段验收）
+workflow.md            任务拆分、优先级、依赖关系与进度
 ```
 
 ## 路线图
