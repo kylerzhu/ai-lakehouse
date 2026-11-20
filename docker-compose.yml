@@ -74,11 +74,13 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
+      # 每次检查都会启动一个 JVM，CPU 开销明显：启动阶段每 3 秒查一次，之后放宽到 30 秒
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
-      interval: 10s
-      timeout: 10s
-      retries: 30
-      start_period: 15s
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+      start_interval: 3s
     mem_limit: 768m
 
   # ------------------------------------------------------------------ 流处理
