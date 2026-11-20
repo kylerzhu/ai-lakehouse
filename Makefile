@@ -49,6 +49,17 @@ topics: ## 创建 Kafka topic（llm.calls.raw / llm.calls.payload），已存在
 	done
 	@$(COMPOSE) exec -T kafka $(KAFKA_BIN)/kafka-topics.sh --bootstrap-server localhost:9092 --list
 
+# ---------------------------------------------------------------- SQL 客户端
+
+flink-sql: ## 打开 Flink SQL 客户端（已加载 Paimon catalog，以 flink 用户运行）
+	$(COMPOSE) exec --user flink flink-jobmanager /opt/flink/bin/sql-client.sh -i /opt/sql/00_catalog.sql
+
+spark-sql: ## 打开 Spark SQL 客户端（按需启动，退出后自动删除；表在 paimon catalog 下）
+	$(COMPOSE) --profile batch run --rm --no-deps spark spark-sql
+
+smoke: ## T04 冒烟测试：Flink 与 Spark 互相读写同一张 Paimon 主键表
+	@./scripts/smoke_paimon.sh
+
 # ---------------------------------------------------------------- 检查
 
 check-jars: ## 验证 infra/jars.txt 中所有 jar 的下载地址
@@ -57,4 +68,4 @@ check-jars: ## 验证 infra/jars.txt 中所有 jar 的下载地址
 spark-version: ## 检查 Spark 容器能否启动（按需运行，结束后自动删除）
 	$(COMPOSE) --profile batch run --rm --no-deps spark /opt/spark/bin/spark-submit --version
 
-.PHONY: help env build up down clean status stats logs topics check-jars spark-version
+.PHONY: help env build up down clean status stats logs topics check-jars spark-version flink-sql spark-sql smoke

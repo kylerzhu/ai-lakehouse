@@ -91,6 +91,7 @@ services:
     volumes:
       - paimon-data:/data/paimon
       - flink-data:/data/flink
+      - ./infra/flink/sql:/opt/sql:ro   # 开发时直接挂载 SQL 文件，修改后无需重新构建镜像
     depends_on:
       volume-init: { condition: service_completed_successfully }
     healthcheck:

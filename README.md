@@ -207,7 +207,7 @@ workflow.md            任务拆分、优先级、依赖关系与进度
 
 ## 路线图
 
-- [ ] **Phase 0 · 环境**：Docker Compose 跑通 Kafka、Flink、Spark、PostgreSQL，Flink 与 Spark 读写同一张 Paimon 表
+- [x] **Phase 0 · 环境**：Docker Compose 跑通 Kafka、Flink、Spark、PostgreSQL，Flink 与 Spark 读写同一张 Paimon 表（`make smoke`）
 - [ ] **Phase 1 · 埋点与造数**：客户端封装、工具装饰器、模拟器与异常注入
 - [ ] **Phase 2 · 实时链路**：Kafka → Flink → Paimon ODS/DWD，分钟级聚合
 - [ ] **Phase 3 · 告警**：成本突增、失败率、重试风暴、延迟劣化四条规则

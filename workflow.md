@@ -128,6 +128,8 @@ flowchart LR
 - **做什么**：在 Flink SQL Client 中创建 Paimon catalog 和一张测试主键表，写入几行（包括重复主键）并读出；然后用 Spark SQL 读同一张表。
 - **产出**：`infra/flink/sql/00_catalog.sql`；`make flink-sql`、`make spark-sql` 两条命令。
 - **验收**：Flink 写入的数据 Spark 能读到；重复主键只保留一行。
+- **结果（2026-11-19 完成）**：`make smoke` 4 项全部通过，重复运行结果一致：① Flink 分两次写入、第二次含重复主键，Spark 读到 4 行且重复主键已合并为最新值；② Spark 再写入 1 行更新 + 1 行新增，得到 5 行；③ Flink 读到 Spark 写入后的结果；④ 表目录归 uid 9999 所有。双向读写都验证了，后面的 Spark 批作业可以直接写 Paimon 表。
+- **新增命令**：`make flink-sql`（以 flink 用户运行，自动加载 catalog）、`make spark-sql`、`make smoke`。JobManager 挂载了 `infra/flink/sql/`，改 SQL 不需要重建镜像。
 - **🏁 M0 完成**
 
 ### M1 最小链路
@@ -357,7 +359,7 @@ git push         # 推送当天进度
 | T01 | 核对组件版本 | P0 | 0.5 | ✅ |
 | T02 | docker-compose 与 Makefile | P0 | 0.5 | ✅ |
 | T03 | Flink 与 Spark 镜像 | P0 | 0.5 | ✅ |
-| T04 | Paimon 冒烟测试 | P0 | 0.5 | ⬜ |
+| T04 | Paimon 冒烟测试 | P0 | 0.5 | ✅ |
 | T05 | Python 项目骨架 | P0 | 0.5 | ⬜ |
 | T06 | 事件 schema 与 producer | P0 | 1 | ⬜ |
 | T07 | Flink 源表与 ODS | P0 | 1 | ⬜ |
